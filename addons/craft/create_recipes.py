@@ -36,9 +36,7 @@ def get_recipe(row):
         'Glimmer Crystal',
         'Shadow Crystal',
     ]
-    result, _, recipe = [
-        td for td in row.findAll('td')
-    ]
+    result, _, recipe = list(row.findAll('td'))
     name = str(result.findAll('a')[0]['title'])
     crystal = None
     ingredients = []
@@ -50,9 +48,8 @@ def get_recipe(row):
         try:
             if li.text is None:
                 ingredients.append("unknown")  # ingredient is "Question Mark", e.g. for Pagodite
-            elif li.text[-1].isdigit() and not "Kit" in english:
-                for n in range(int(li.text[-1])):
-                    ingredients.append(english)
+            elif li.text[-1].isdigit() and "Kit" not in english:
+                ingredients.extend(english for _ in range(int(li.text[-1])))
             else:
                 ingredients.append(english)
         except IndexError:
@@ -60,20 +57,20 @@ def get_recipe(row):
     return [(name, crystal, ingredients)]
 
 def get_sphere_recipe(row):
-    spheres = [
-        'Liquefaction Sphere',
-        'Transfixion Sphere',
-        'Detonation Sphere',
-        'Impaction Sphere',
-        'Induration Sphere',
-        'Reverberation Sphere',
-        'Scission Sphere',
-        'Compression Sphere',
-    ]
     global sphere
-    cells = [td for td in row.findAll('td')]
+    cells = list(row.findAll('td'))
     if len(cells) > 4:
         rare_ex, rare, ex, c, s = cells[:5]
+        spheres = [
+            'Liquefaction Sphere',
+            'Transfixion Sphere',
+            'Detonation Sphere',
+            'Impaction Sphere',
+            'Induration Sphere',
+            'Reverberation Sphere',
+            'Scission Sphere',
+            'Compression Sphere',
+        ]
         if str(s.findAll('a')[0]['title']) in spheres:
             sphere = str(s.findAll('a')[0]['title'])
     else:
@@ -82,23 +79,19 @@ def get_sphere_recipe(row):
     crystal = str(c.findAll('img')[0]['alt']).rstrip(' icon.png')
     ingredients = []
     for cell in cells[:3]:
-        for a in cell.findAll('a'):
-            recipes.append((sphere, crystal, [str(a['title'])]))
+        recipes.extend((sphere, crystal, [str(a['title'])]) for a in cell.findAll('a'))
     return recipes
 
 def get_recipes_from_rows(rows, spheres=False):
     recipes = {}
     for row in rows:
-        if spheres:
-            subrecipes = get_sphere_recipe(row)
-        else:
-            subrecipes = get_recipe(row)
+        subrecipes = get_sphere_recipe(row) if spheres else get_recipe(row)
         for (name, crystal, ingredients) in subrecipes:
-            while name in recipes.keys():
+            while name in recipes:
                 if name[-1].isdigit():
                     name = name[:-2] + (" %d" % (int(name[-1]) + 1))
                 else:
-                    name = name + " 2"
+                    name = f"{name} 2"
             recipes[name] = [crystal, ingredients]
     return recipes
 
@@ -159,11 +152,11 @@ def get_items():
     items = get_items_dictionary()
     inverted = {}
     for k, v in items.items():
-        if not v['en'].lower() in inverted:
+        if v['en'].lower() not in inverted:
             inverted[v['en'].lower()] = k
-        if not v['enl'].lower() in inverted:
+        if v['enl'].lower() not in inverted:
             inverted[v['enl'].lower()] = k
-    inverted.update(exceptions)
+    inverted |= exceptions
     return items, inverted
 
 def get_item(ingredient, inverted):
@@ -193,8 +186,7 @@ def fix_recipes(recipes):
                 sorted.append(inverted[ingredient])
             else:
                 sorted.append(get_item(ingredient, inverted))
-        sorted = list(filter(lambda item: item is not None, sorted))
-        sorted.sort()
+        sorted = sorted(filter(lambda item: item is not None, sorted))
         ingredients = [
             items[ingredient]['en']
             for ingredient in sorted
@@ -216,9 +208,9 @@ def save_recipes(recipes):
         fd.write("}\n")
 
 def get_recipes(craft, spheres=False):
-    base = "https://www.bg-wiki.com/bg/"
-    name = "%s.html" % craft
+    name = f"{craft}.html"
     if not os.path.exists(name):
+        base = "https://www.bg-wiki.com/bg/"
         req = urllib.request.Request(base + craft, headers=hdr)
         try:
             page = urllib.request.urlopen(req).read()
@@ -244,7 +236,7 @@ if __name__ == "__main__":
     ]
     recipes = {}
     for craft in crafts:
-        recipes.update(get_recipes(craft))
+        recipes |= get_recipes(craft)
     recipes.update(get_recipes('Category:Escutcheons', True))
     fix_recipes(recipes)
     save_recipes(recipes)

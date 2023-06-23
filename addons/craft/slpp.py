@@ -61,8 +61,7 @@ class SLPP(object):
         self.at, self.ch, self.depth = 0, '', 0
         self.len = len(text)
         self.next_chr()
-        result = self.value()
-        return result
+        return self.value()
 
     def encode(self, obj):
         self.depth = 0
@@ -91,7 +90,7 @@ class SLPP(object):
             self.depth += 1
             if len(obj) == 0 or ( tp is not dict and len(filter(
                     lambda x:  type(x) in (int, float) \
-                    or (isinstance(x, basestring) and len(x) < 10),  obj
+                        or (isinstance(x, basestring) and len(x) < 10),  obj
                 )) == len(obj) ):
                 newline = tab = ''
             dp = tab * self.depth
@@ -102,11 +101,10 @@ class SLPP(object):
                     if type(k) is int:
                         contents.append(self.__encode(v))
                     else:
-                        contents.append(dp + '%s = %s' % (k, self.__encode(v)))
-                s += (',%s' % newline).join(contents)
+                        contents.append(f'{dp}{k} = {self.__encode(v)}')
+                s += f',{newline}'.join(contents)
             else:
-                s += (',%s' % newline).join(
-                    [dp + self.__encode(el) for el in obj])
+                s += f',{newline}'.join([dp + self.__encode(el) for el in obj])
             self.depth -= 1
             s += "%s%s}" % (newline, tab * self.depth)
         return s
@@ -136,16 +134,14 @@ class SLPP(object):
             self.next_chr()
         if self.ch in ['"',  "'",  '[']:
             return self.string(self.ch)
-        if self.ch.isdigit() or self.ch == '-':
-            return self.number()
-        return self.word()
+        return self.number() if self.ch.isdigit() or self.ch == '-' else self.word()
 
     def string(self, end=None):
-        s = ''
         start = self.ch
         if end == '[':
             end = ']'
         if start in ['"',  "'",  '[']:
+            s = ''
             while self.next_chr():
                 if self.ch == end:
                     self.next_chr()
@@ -161,7 +157,6 @@ class SLPP(object):
     def object(self):
         o = {}
         k = None
-        idx = 0
         numeric_keys = False
         self.depth += 1
         self.next_chr()
@@ -171,6 +166,7 @@ class SLPP(object):
             self.next_chr()
             return o #Exit here
         else:
+            idx = 0
             while self.ch:
                 self.white()
                 if self.ch == '{':
@@ -182,7 +178,11 @@ class SLPP(object):
                     self.next_chr()
                     if k is not None:
                        o[idx] = k
-                    if not numeric_keys and len([ key for key in o if isinstance(key, (str, float, bool, tuple))]) == 0:
+                    if not numeric_keys and not [
+                        key
+                        for key in o
+                        if isinstance(key, (str, float, bool, tuple))
+                    ]:
                         ar = []
                         for key in o:
                            ar.insert(key, o[key])
@@ -212,9 +212,7 @@ class SLPP(object):
 
     words = {'true': True, 'false': False, 'nil': None}
     def word(self):
-        s = ''
-        if self.ch != '\n':
-            s = self.ch
+        s = self.ch if self.ch != '\n' else ''
         self.next_chr()
         while self.ch is not None and self.alnum.match(self.ch) and s not in self.words:
             s += self.ch
